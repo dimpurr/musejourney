@@ -24,7 +24,7 @@ export interface TrainingSession {
   totalQuestions: number;
   correctAnswers: number;
   duration: number; // 以秒为单位
-  settings: any; // 训练设置
+  settings: Partial<TrainingSettings>; // 训练设置
 }
 
 // 训练历史
@@ -54,16 +54,19 @@ export interface ProgressionTrainingSettings {
   difficulty: 'beginner' | 'intermediate' | 'advanced';
 }
 
+// 通用设置
+export interface GeneralSettings {
+  autoPlayEnabled: boolean;
+  showKeyboard: boolean;
+  keyboardSize: 'small' | 'medium' | 'large';
+}
+
 // 所有训练设置
 export interface TrainingSettings {
   interval: IntervalTrainingSettings;
   chord: ChordTrainingSettings;
   progression: ProgressionTrainingSettings;
-  general: {
-    autoPlayEnabled: boolean;
-    showKeyboard: boolean;
-    keyboardSize: 'small' | 'medium' | 'large';
-  };
+  general: GeneralSettings;
 }
 
 // 默认音程训练设置
@@ -88,16 +91,19 @@ const DEFAULT_PROGRESSION_SETTINGS: ProgressionTrainingSettings = {
   difficulty: 'beginner'
 };
 
+// 默认通用设置
+const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
+  autoPlayEnabled: true,
+  showKeyboard: true,
+  keyboardSize: 'medium'
+};
+
 // 默认训练设置
 const DEFAULT_SETTINGS: TrainingSettings = {
   interval: DEFAULT_INTERVAL_SETTINGS,
   chord: DEFAULT_CHORD_SETTINGS,
   progression: DEFAULT_PROGRESSION_SETTINGS,
-  general: {
-    autoPlayEnabled: true,
-    showKeyboard: true,
-    keyboardSize: 'medium'
-  }
+  general: DEFAULT_GENERAL_SETTINGS
 };
 
 // 存储键
