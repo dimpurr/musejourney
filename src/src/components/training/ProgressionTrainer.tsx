@@ -136,16 +136,19 @@ export default function ProgressionTrainer({
     
     const sessionDuration = Math.round((Date.now() - sessionStartTime.current) / 1000);
     
-    // 添加训练会话记录
-    addTrainingSession({
-      id: sessionId,
-      type: 'progression',
-      timestamp: sessionStartTime.current,
-      totalQuestions: stats.total,
-      correctAnswers: stats.correct,
-      duration: sessionDuration,
-      settings: { progression: settings }
-    });
+    // 只有当至少回答了一个问题时才记录会话
+    if (stats.total > 0) {
+      // 添加训练会话记录
+      addTrainingSession({
+        id: sessionId,
+        type: 'progression',
+        timestamp: sessionStartTime.current,
+        totalQuestions: stats.total,
+        correctAnswers: stats.correct,
+        duration: sessionDuration,
+        settings: { progression: settings }
+      });
+    }
     
     setSessionActive(false);
   }, [sessionActive, sessionId, stats, settings]);
@@ -203,13 +206,11 @@ export default function ProgressionTrainer({
   
   // 初始化
   useEffect(() => {
-    if (!sessionActive && stats.total === 0) {
-      startNewSession();
-    }
+    // 不再自动开始会话，只生成和声进行
     if (availableProgressions.length > 0) {
       generateNewProgression();
     }
-  }, [availableProgressions, generateNewProgression, sessionActive, stats.total, startNewSession]);
+  }, [availableProgressions, generateNewProgression]);
   
   // 播放当前和声进行
   const playCurrentProgression = useCallback(() => {
@@ -261,6 +262,11 @@ export default function ProgressionTrainer({
   const checkAnswer = useCallback((answer: string) => {
     if (!currentProgression || userAnswer !== null) return;
     
+    // 如果会话尚未开始，则开始会话
+    if (!sessionActive) {
+      startNewSession();
+    }
+    
     setUserAnswer(answer);
     const isAnswerCorrect = answer === currentProgression.name;
     setIsCorrect(isAnswerCorrect);
@@ -304,7 +310,7 @@ export default function ProgressionTrainer({
         }, 1000); // 延迟1秒后播放，以便用户能够区分
       }
     }
-  }, [currentProgression, userAnswer]);
+  }, [currentProgression, userAnswer, sessionActive, startNewSession]);
   
   // 上一个和声进行
   const previousProgression = () => {

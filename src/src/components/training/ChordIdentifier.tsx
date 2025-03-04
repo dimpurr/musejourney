@@ -147,16 +147,19 @@ export default function ChordIdentifier({
     
     const sessionDuration = Math.round((Date.now() - sessionStartTime.current) / 1000);
     
-    // 添加训练会话记录
-    addTrainingSession({
-      id: sessionId,
-      type: 'chord',
-      timestamp: sessionStartTime.current,
-      totalQuestions: stats.total,
-      correctAnswers: stats.correct,
-      duration: sessionDuration,
-      settings: { chord: settings }
-    });
+    // 只有当至少回答了一个问题时才记录会话
+    if (stats.total > 0) {
+      // 添加训练会话记录
+      addTrainingSession({
+        id: sessionId,
+        type: 'chord',
+        timestamp: sessionStartTime.current,
+        totalQuestions: stats.total,
+        correctAnswers: stats.correct,
+        duration: sessionDuration,
+        settings: { chord: settings }
+      });
+    }
     
     setSessionActive(false);
   }, [sessionActive, sessionId, stats, settings]);
@@ -232,11 +235,9 @@ export default function ChordIdentifier({
   
   // 初始化
   useEffect(() => {
-    if (!sessionActive && stats.total === 0) {
-      startNewSession();
-    }
+    // 不再自动开始会话，只生成和弦
     generateChord();
-  }, [generateChord, sessionActive, stats.total, startNewSession]);
+  }, [generateChord]);
   
   // 播放和弦
   const playCurrentChord = (arpeggio: boolean = false) => {
@@ -265,6 +266,11 @@ export default function ChordIdentifier({
   // 检查根音答案
   const checkRootAnswer = (answer: string) => {
     if (!currentChord || !settings.identifyRoot) return;
+    
+    // 如果会话尚未开始，则开始会话
+    if (!sessionActive) {
+      startNewSession();
+    }
     
     setUserRootAnswer(answer);
     const correct = answer === currentChord.root;
@@ -317,6 +323,11 @@ export default function ChordIdentifier({
   // 检查和弦类型答案
   const checkTypeAnswer = (answer: string) => {
     if (!currentChord || !settings.identifyType) return;
+    
+    // 如果会话尚未开始，则开始会话
+    if (!sessionActive) {
+      startNewSession();
+    }
     
     setUserTypeAnswer(answer);
     const correct = answer === currentChord.type;

@@ -117,16 +117,19 @@ export default function IntervalTrainer({
     
     const sessionDuration = Math.round((Date.now() - sessionStartTime.current) / 1000);
     
-    // 添加训练会话记录
-    addTrainingSession({
-      id: sessionId,
-      type: 'interval',
-      timestamp: sessionStartTime.current,
-      totalQuestions: stats.total,
-      correctAnswers: stats.correct,
-      duration: sessionDuration,
-      settings: { interval: settings }
-    });
+    // 只有当至少回答了一个问题时才记录会话
+    if (stats.total > 0) {
+      // 添加训练会话记录
+      addTrainingSession({
+        id: sessionId,
+        type: 'interval',
+        timestamp: sessionStartTime.current,
+        totalQuestions: stats.total,
+        correctAnswers: stats.correct,
+        duration: sessionDuration,
+        settings: { interval: settings }
+      });
+    }
     
     setSessionActive(false);
   }, [sessionActive, sessionId, stats, settings]);
@@ -191,11 +194,9 @@ export default function IntervalTrainer({
   
   // 初始化
   useEffect(() => {
-    if (!sessionActive && stats.total === 0) {
-      startNewSession();
-    }
+    // 不再自动开始会话，只生成音程
     generateInterval();
-  }, [generateInterval, sessionActive, stats.total, startNewSession]);
+  }, [generateInterval]);
   
   // 播放音程
   const playInterval = (mode: 'ascending' | 'descending' | 'harmonic' | 'random' = 'ascending') => {
@@ -299,6 +300,11 @@ export default function IntervalTrainer({
   // 检查答案
   const checkAnswer = (answer: string) => {
     if (!currentInterval || userAnswer !== null) return;
+    
+    // 如果会话尚未开始，则开始会话
+    if (!sessionActive) {
+      startNewSession();
+    }
     
     setUserAnswer(answer);
     const correct = answer === currentInterval.intervalShortName;
