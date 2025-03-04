@@ -60,14 +60,24 @@ export function getScaleInfo(scaleName: string): Scale | null {
  */
 export function getKeyInfo(keyName: string): Key | null {
   try {
-    const [tonic, type] = Tonal.Key.tokenize(keyName);
+    // 手动解析调性名称
+    const parts = keyName.split(' ');
+    const tonic = parts[0];
+    const type = parts.length > 1 ? parts[1] : 'major';
     
-    if (!tonic || !type) {
+    if (!tonic) {
       return null;
     }
     
-    const key = Tonal.Key.majorKey(tonic);
-    const signature = key.alteration;
+    // 根据调性类型获取调号
+    let signature = 0;
+    if (type.toLowerCase() === 'major') {
+      const key = Tonal.Key.majorKey(tonic);
+      signature = key.keySignature.indexOf('#') > -1 ? key.keySignature.length : -key.keySignature.length;
+    } else if (type.toLowerCase() === 'minor') {
+      const key = Tonal.Key.minorKey(tonic);
+      signature = key.keySignature.indexOf('#') > -1 ? key.keySignature.length : -key.keySignature.length;
+    }
     
     return {
       name: keyName,
@@ -104,7 +114,7 @@ export function getIntervalInfo(interval: string): Interval | null {
  */
 export function getIntervalBetweenNotes(noteA: string, noteB: string): Interval | null {
   try {
-    const interval = Tonal.Distance.interval(noteA, noteB);
+    const interval = Tonal.distance(noteA, noteB);
     return interval as Interval;
   } catch (error) {
     console.error('Error calculating interval between notes:', error);
@@ -159,8 +169,14 @@ export function getChordFunction(chordName: string, keyName: string): string | n
     const chordRoot = chord.root.slice(0, -1); // 移除八度信息
     const keyTonic = key.tonic.slice(0, -1); // 移除八度信息
     
-    const degree = Tonal.Note.transpose(keyTonic, Tonal.Distance.interval(keyTonic, chordRoot));
-    const degreeIndex = Tonal.Scale.degrees(key.type === 'major' ? 'major' : 'minor')(key.tonic).indexOf(degree);
+    const degree = Tonal.transpose(keyTonic, Tonal.distance(keyTonic, chordRoot));
+    
+    // 获取音阶音级
+    const scaleType = key.type === 'major' ? 'major' : 'minor';
+    const scale = Tonal.Scale.get(`${key.tonic} ${scaleType}`);
+    const scaleNotes = scale.notes.map(note => note.slice(0, -1)); // 移除八度信息
+    
+    const degreeIndex = scaleNotes.indexOf(degree);
     
     // 罗马数字表示
     const romanNumerals = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
@@ -206,45 +222,52 @@ export function getCommonProgressions(keyName: string): Record<string, ChordProg
     }
     
     // 获取调内和弦
-    const chords = Tonal.Key.chords(keyName);
+    let chordsInKey: Array<string> = [];
+    if (key.type.toLowerCase() === 'major') {
+      const majorKey = Tonal.Key.majorKey(key.tonic);
+      chordsInKey = [...majorKey.chords];
+    } else if (key.type.toLowerCase() === 'minor') {
+      const minorKey = Tonal.Key.minorKey(key.tonic);
+      chordsInKey = [...minorKey.harmonic.chords];
+    }
     
     // 常见和弦进行
     const progressions: Record<string, ChordProgression> = {
       'I-IV-V': {
         name: 'I-IV-V',
         chords: [
-          getChordInfo(chords[0]) as Chord,
-          getChordInfo(chords[3]) as Chord,
-          getChordInfo(chords[4]) as Chord,
+          getChordInfo(chordsInKey[0]) as Chord,
+          getChordInfo(chordsInKey[3]) as Chord,
+          getChordInfo(chordsInKey[4]) as Chord,
         ],
         key: key,
       },
       'I-V-vi-IV': {
         name: 'I-V-vi-IV (流行进行)',
         chords: [
-          getChordInfo(chords[0]) as Chord,
-          getChordInfo(chords[4]) as Chord,
-          getChordInfo(chords[5]) as Chord,
-          getChordInfo(chords[3]) as Chord,
+          getChordInfo(chordsInKey[0]) as Chord,
+          getChordInfo(chordsInKey[4]) as Chord,
+          getChordInfo(chordsInKey[5]) as Chord,
+          getChordInfo(chordsInKey[3]) as Chord,
         ],
         key: key,
       },
       'ii-V-I': {
         name: 'ii-V-I (爵士进行)',
         chords: [
-          getChordInfo(chords[1]) as Chord,
-          getChordInfo(chords[4]) as Chord,
-          getChordInfo(chords[0]) as Chord,
+          getChordInfo(chordsInKey[1]) as Chord,
+          getChordInfo(chordsInKey[4]) as Chord,
+          getChordInfo(chordsInKey[0]) as Chord,
         ],
         key: key,
       },
       'I-vi-IV-V': {
         name: 'I-vi-IV-V (50年代进行)',
         chords: [
-          getChordInfo(chords[0]) as Chord,
-          getChordInfo(chords[5]) as Chord,
-          getChordInfo(chords[3]) as Chord,
-          getChordInfo(chords[4]) as Chord,
+          getChordInfo(chordsInKey[0]) as Chord,
+          getChordInfo(chordsInKey[5]) as Chord,
+          getChordInfo(chordsInKey[3]) as Chord,
+          getChordInfo(chordsInKey[4]) as Chord,
         ],
         key: key,
       },
