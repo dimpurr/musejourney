@@ -5,13 +5,14 @@ import { playChordProgression } from '@/lib/audio/audioEngine';
 import { getChordInfo } from '@/lib/theory/musicTheory';
 import PianoKeyboard from '../music/PianoKeyboard';
 import TrainingHistory from './TrainingHistory';
-import TrainingSettings from './TrainingSettings';
+import TrainingSettingsComponent from './TrainingSettings';
 import TrainingProgress from './TrainingProgress';
 import { 
   getTypeSettings, 
   updateTypeSettings, 
   addTrainingSession, 
   generateId,
+  type TrainingType,
   type ProgressionTrainingSettings,
   type GeneralSettings,
   type TrainingSettings as TrainingSettingsType
@@ -213,7 +214,9 @@ export default function ProgressionTrainer({
           
           if (noteName in noteMap) {
             const midiNote = 12 * (octave + 1) + noteMap[noteName];
-            allNotes.push(midiNote);
+            if (!allNotes.includes(midiNote)) {
+              allNotes.push(midiNote);
+            }
           }
         }
       });
@@ -249,7 +252,18 @@ export default function ProgressionTrainer({
       setSettings(prev => ({ ...prev, ...newSettings.progression }));
     }
     if (newSettings.general) {
-      setSettings(prev => ({ ...prev, general: { ...prev.general, ...newSettings.general } }));
+      setSettings(prev => {
+        const updatedSettings: ExtendedProgressionSettings = {
+          ...prev,
+          general: {
+            ...prev.general,
+            autoPlayEnabled: newSettings.general.autoPlayEnabled ?? prev.general.autoPlayEnabled,
+            showKeyboard: newSettings.general.showKeyboard ?? prev.general.showKeyboard,
+            keyboardSize: newSettings.general.keyboardSize ?? prev.general.keyboardSize
+          }
+        };
+        return updatedSettings;
+      });
     }
   };
   
@@ -447,8 +461,8 @@ export default function ProgressionTrainer({
       
       {/* 设置内容 */}
       {activeTab === 'settings' && (
-        <TrainingSettings 
-          type="progression" 
+        <TrainingSettingsComponent
+          type="progression"
           onSettingsChange={handleSettingsChange}
         />
       )}

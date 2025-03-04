@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { playNote } from '@/lib/audio/audioEngine';
+import { playNote, playInterval as playIntervalSound } from '@/lib/audio/audioEngine';
+import { getIntervalInfo } from '@/lib/theory/musicTheory';
 import PianoKeyboard from '../music/PianoKeyboard';
 import TrainingHistory from './TrainingHistory';
-import TrainingSettings from './TrainingSettings';
+import TrainingSettingsComponent from './TrainingSettings';
 import TrainingProgress from './TrainingProgress';
 import { 
   getTypeSettings, 
   updateTypeSettings, 
   addTrainingSession, 
   generateId,
+  type TrainingType,
   type IntervalTrainingSettings,
   type GeneralSettings,
-  type TrainingSettings
+  type TrainingSettings as TrainingSettingsType
 } from '@/lib/training/trainingStorage';
 
 // 定义音程类型
@@ -234,7 +236,7 @@ export default function IntervalTrainer({
   };
   
   // 处理设置变更
-  const handleSettingsChange = (newSettings: Partial<TrainingSettings>) => {
+  const handleSettingsChange = (newSettings: Partial<TrainingSettingsType>) => {
     if (newSettings.interval) {
       setSettings(prev => ({ ...prev, ...newSettings.interval }));
     }
@@ -406,11 +408,11 @@ export default function IntervalTrainer({
           )}
           
           {/* 钢琴键盘 */}
-          {settings.general?.showKeyboard && (showAnswer || isCorrect) && (
-            <div className="keyboard-display">
+          {settings.general?.showKeyboard && currentInterval && (showAnswer || isCorrect) && (
+            <div className="keyboard-display mt-6">
               <PianoKeyboard
-                startNote={Math.max(36, currentInterval.firstNoteMidi - 5)}
-                endNote={Math.min(84, currentInterval.secondNoteMidi + 5)}
+                startNote={Math.max(36, Math.min(currentInterval.firstNoteMidi, currentInterval.secondNoteMidi) - 5)}
+                endNote={Math.min(84, Math.max(currentInterval.firstNoteMidi, currentInterval.secondNoteMidi) + 5)}
                 highlightedNotes={[currentInterval.firstNoteMidi, currentInterval.secondNoteMidi]}
               />
             </div>
@@ -447,8 +449,8 @@ export default function IntervalTrainer({
       
       {/* 设置内容 */}
       {activeTab === 'settings' && (
-        <TrainingSettings 
-          type="interval" 
+        <TrainingSettingsComponent
+          type="interval"
           onSettingsChange={handleSettingsChange}
         />
       )}

@@ -4,16 +4,17 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { playChord } from '@/lib/audio/audioEngine';
 import PianoKeyboard from '../music/PianoKeyboard';
 import TrainingHistory from './TrainingHistory';
-import TrainingSettings from './TrainingSettings';
+import TrainingSettingsComponent from './TrainingSettings';
 import TrainingProgress from './TrainingProgress';
 import { 
   getTypeSettings, 
   updateTypeSettings, 
   addTrainingSession, 
   generateId,
+  type TrainingType,
   type ChordTrainingSettings,
   type GeneralSettings,
-  type TrainingSettings
+  type TrainingSettings as TrainingSettingsType
 } from '@/lib/training/trainingStorage';
 
 // 定义和弦类型
@@ -282,7 +283,7 @@ export default function ChordIdentifier({
   };
   
   // 处理设置变更
-  const handleSettingsChange = (newSettings: Partial<TrainingSettings>) => {
+  const handleSettingsChange = (newSettings: Partial<TrainingSettingsType>) => {
     if (newSettings.chord) {
       setSettings(prev => ({ ...prev, ...newSettings.chord }));
     }
@@ -488,8 +489,8 @@ export default function ChordIdentifier({
           )}
           
           {/* 钢琴键盘 */}
-          {settings.general?.showKeyboard && (showAnswer || isAllCorrect) && (
-            <div className="keyboard-display">
+          {settings.general?.showKeyboard && currentChord && (showAnswer || isAllCorrect) && (
+            <div className="keyboard-display mt-6">
               <PianoKeyboard
                 startNote={Math.max(36, Math.min(...currentChord.midiNotes) - 5)}
                 endNote={Math.min(84, Math.max(...currentChord.midiNotes) + 5)}
@@ -529,8 +530,8 @@ export default function ChordIdentifier({
       
       {/* 设置内容 */}
       {activeTab === 'settings' && (
-        <TrainingSettings 
-          type="chord" 
+        <TrainingSettingsComponent
+          type="chord"
           onSettingsChange={handleSettingsChange}
         />
       )}
