@@ -19,10 +19,10 @@ const toolCategories = [
         icon: '🎹'
       },
       { 
-        id: 'progression-analyzer', 
-        title: '和声进行分析器', 
-        description: '分析和声进行的功能和常见用法。',
-        status: 'coming-soon',
+        id: 'harmony-analyzer', 
+        title: '和声分析器', 
+        description: '分析和声进行的功能和常见用法，获取和弦进行建议。',
+        status: 'available',
         icon: '📊'
       },
       { 
@@ -159,6 +159,9 @@ export default function ToolsPage() {
                           <h3 className="text-lg font-medium">{tool.title}</h3>
                           {tool.status === 'coming-soon' && (
                             <span className="ml-2 text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">即将推出</span>
+                          )}
+                          {tool.status === 'available' && (
+                            <span className="ml-2 text-xs text-green-500 bg-green-100 px-2 py-1 rounded">可用</span>
                           )}
                         </div>
                         <p className="text-gray-600 text-sm mt-1">{tool.description}</p>

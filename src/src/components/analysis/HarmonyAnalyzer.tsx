@@ -66,19 +66,8 @@ export default function HarmonyAnalyzer({
     
     try {
       // 获取常见的后续和弦
-      // 由于getCommonProgressions只接受一个参数，我们直接使用key
-      const progressions = getCommonProgressions(key);
-      
-      // 将progressions对象转换为string[][]格式
-      const nextChords: string[][] = [];
-      Object.values(progressions).forEach(progression => {
-        if (progression && progression.chords) {
-          const chordNames = progression.chords.map(chord => chord.symbol);
-          if (chordNames.length > 0) {
-            nextChords.push(chordNames);
-          }
-        }
-      });
+      const lastChord = chords[chords.length - 1];
+      const nextChords = getCommonProgressions(lastChord, key);
       
       setSuggestions(nextChords);
       setError(null);
