@@ -207,76 +207,177 @@ export function getChordFunction(chordName: string, keyName: string): string | n
 /**
  * 获取常见和弦进行
  */
-export function getCommonProgressions(keyName: string): Record<string, ChordProgression> {
-  try {
-    const key = getKeyInfo(keyName);
-    
-    if (!key) {
+export function getCommonProgressions(keyName: string): Record<string, ChordProgression>;
+export function getCommonProgressions(chordName: string, keyName: string): string[][];
+export function getCommonProgressions(arg1: string, arg2?: string): Record<string, ChordProgression> | string[][] {
+  // 如果只有一个参数，返回调性中的常见和弦进行
+  if (!arg2) {
+    try {
+      const keyName = arg1;
+      const key = getKeyInfo(keyName);
+      
+      if (!key) {
+        return {};
+      }
+      
+      const scale = getScaleInfo(`${key.tonic} ${key.type}`);
+      
+      if (!scale) {
+        return {};
+      }
+      
+      // 获取调内和弦
+      let chordsInKey: Array<string> = [];
+      if (key.type.toLowerCase() === 'major') {
+        const majorKey = Tonal.Key.majorKey(key.tonic);
+        chordsInKey = [...majorKey.chords];
+      } else if (key.type.toLowerCase() === 'minor') {
+        const minorKey = Tonal.Key.minorKey(key.tonic);
+        chordsInKey = [...minorKey.harmonic.chords];
+      }
+      
+      // 常见和弦进行
+      const progressions: Record<string, ChordProgression> = {
+        'I-IV-V': {
+          name: 'I-IV-V',
+          chords: [
+            getChordInfo(chordsInKey[0]) as Chord,
+            getChordInfo(chordsInKey[3]) as Chord,
+            getChordInfo(chordsInKey[4]) as Chord,
+          ],
+          key: key,
+        },
+        'I-V-vi-IV': {
+          name: 'I-V-vi-IV (流行进行)',
+          chords: [
+            getChordInfo(chordsInKey[0]) as Chord,
+            getChordInfo(chordsInKey[4]) as Chord,
+            getChordInfo(chordsInKey[5]) as Chord,
+            getChordInfo(chordsInKey[3]) as Chord,
+          ],
+          key: key,
+        },
+        'ii-V-I': {
+          name: 'ii-V-I (爵士进行)',
+          chords: [
+            getChordInfo(chordsInKey[1]) as Chord,
+            getChordInfo(chordsInKey[4]) as Chord,
+            getChordInfo(chordsInKey[0]) as Chord,
+          ],
+          key: key,
+        },
+        'I-vi-IV-V': {
+          name: 'I-vi-IV-V (50年代进行)',
+          chords: [
+            getChordInfo(chordsInKey[0]) as Chord,
+            getChordInfo(chordsInKey[5]) as Chord,
+            getChordInfo(chordsInKey[3]) as Chord,
+            getChordInfo(chordsInKey[4]) as Chord,
+          ],
+          key: key,
+        },
+        'vi-IV-I-V': {
+          name: 'vi-IV-I-V (悲伤进行)',
+          chords: [
+            getChordInfo(chordsInKey[5]) as Chord,
+            getChordInfo(chordsInKey[3]) as Chord,
+            getChordInfo(chordsInKey[0]) as Chord,
+            getChordInfo(chordsInKey[4]) as Chord,
+          ],
+          key: key,
+        },
+      };
+      
+      return progressions;
+    } catch (error) {
+      console.error('Error getting common progressions:', error);
       return {};
     }
-    
-    const scale = getScaleInfo(`${key.tonic} ${key.type}`);
-    
-    if (!scale) {
-      return {};
+  } 
+  // 如果有两个参数，根据当前和弦和调性返回后续和弦建议
+  else {
+    try {
+      const chordName = arg1;
+      const keyName = arg2;
+      
+      // 获取和弦功能
+      const chordFunction = getChordFunction(chordName, keyName);
+      if (!chordFunction) {
+        return [];
+      }
+      
+      // 根据和弦功能提供后续和弦建议
+      const suggestions: string[][] = [];
+      
+      // 获取调内和弦
+      const key = getKeyInfo(keyName);
+      if (!key) {
+        return [];
+      }
+      
+      let chordsInKey: Array<string> = [];
+      if (key.type.toLowerCase() === 'major') {
+        const majorKey = Tonal.Key.majorKey(key.tonic);
+        chordsInKey = [...majorKey.chords];
+      } else if (key.type.toLowerCase() === 'minor') {
+        const minorKey = Tonal.Key.minorKey(key.tonic);
+        chordsInKey = [...minorKey.harmonic.chords];
+      }
+      
+      // 根据当前和弦功能提供常见后续和弦
+      switch (chordFunction.toLowerCase()) {
+        case 'i':
+        case 'i7':
+          suggestions.push([chordsInKey[3]]); // I -> IV
+          suggestions.push([chordsInKey[4]]); // I -> V
+          suggestions.push([chordsInKey[5]]); // I -> vi
+          suggestions.push([chordsInKey[1], chordsInKey[4]]); // I -> ii -> V
+          break;
+        case 'ii':
+        case 'ii7':
+          suggestions.push([chordsInKey[4]]); // ii -> V
+          suggestions.push([chordsInKey[4], chordsInKey[0]]); // ii -> V -> I
+          break;
+        case 'iii':
+        case 'iii7':
+          suggestions.push([chordsInKey[5]]); // iii -> vi
+          suggestions.push([chordsInKey[1]]); // iii -> ii
+          break;
+        case 'iv':
+        case 'iv7':
+          suggestions.push([chordsInKey[0]]); // IV -> I
+          suggestions.push([chordsInKey[4]]); // IV -> V
+          suggestions.push([chordsInKey[4], chordsInKey[0]]); // IV -> V -> I
+          break;
+        case 'v':
+        case 'v7':
+          suggestions.push([chordsInKey[0]]); // V -> I
+          suggestions.push([chordsInKey[5]]); // V -> vi
+          suggestions.push([chordsInKey[3]]); // V -> IV
+          break;
+        case 'vi':
+        case 'vi7':
+          suggestions.push([chordsInKey[1]]); // vi -> ii
+          suggestions.push([chordsInKey[3]]); // vi -> IV
+          suggestions.push([chordsInKey[3], chordsInKey[0]]); // vi -> IV -> I
+          break;
+        case 'vii°':
+        case 'vii°7':
+          suggestions.push([chordsInKey[0]]); // vii° -> I
+          suggestions.push([chordsInKey[5]]); // vii° -> vi
+          break;
+        default:
+          // 如果无法确定和弦功能，提供一些通用建议
+          suggestions.push([chordsInKey[0]]); // -> I
+          suggestions.push([chordsInKey[4]]); // -> V
+          suggestions.push([chordsInKey[3]]); // -> IV
+      }
+      
+      return suggestions;
+    } catch (error) {
+      console.error('Error getting chord suggestions:', error);
+      return [];
     }
-    
-    // 获取调内和弦
-    let chordsInKey: Array<string> = [];
-    if (key.type.toLowerCase() === 'major') {
-      const majorKey = Tonal.Key.majorKey(key.tonic);
-      chordsInKey = [...majorKey.chords];
-    } else if (key.type.toLowerCase() === 'minor') {
-      const minorKey = Tonal.Key.minorKey(key.tonic);
-      chordsInKey = [...minorKey.harmonic.chords];
-    }
-    
-    // 常见和弦进行
-    const progressions: Record<string, ChordProgression> = {
-      'I-IV-V': {
-        name: 'I-IV-V',
-        chords: [
-          getChordInfo(chordsInKey[0]) as Chord,
-          getChordInfo(chordsInKey[3]) as Chord,
-          getChordInfo(chordsInKey[4]) as Chord,
-        ],
-        key: key,
-      },
-      'I-V-vi-IV': {
-        name: 'I-V-vi-IV (流行进行)',
-        chords: [
-          getChordInfo(chordsInKey[0]) as Chord,
-          getChordInfo(chordsInKey[4]) as Chord,
-          getChordInfo(chordsInKey[5]) as Chord,
-          getChordInfo(chordsInKey[3]) as Chord,
-        ],
-        key: key,
-      },
-      'ii-V-I': {
-        name: 'ii-V-I (爵士进行)',
-        chords: [
-          getChordInfo(chordsInKey[1]) as Chord,
-          getChordInfo(chordsInKey[4]) as Chord,
-          getChordInfo(chordsInKey[0]) as Chord,
-        ],
-        key: key,
-      },
-      'I-vi-IV-V': {
-        name: 'I-vi-IV-V (50年代进行)',
-        chords: [
-          getChordInfo(chordsInKey[0]) as Chord,
-          getChordInfo(chordsInKey[5]) as Chord,
-          getChordInfo(chordsInKey[3]) as Chord,
-          getChordInfo(chordsInKey[4]) as Chord,
-        ],
-        key: key,
-      },
-    };
-    
-    return progressions;
-  } catch (error) {
-    console.error('Error getting common progressions:', error);
-    return {};
   }
 }
 

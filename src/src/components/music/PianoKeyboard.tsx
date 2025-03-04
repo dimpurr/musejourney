@@ -11,7 +11,7 @@ interface PianoKeyboardProps {
   showNoteNames?: boolean; // 是否显示音符名称
   highlightedNotes?: number[]; // 高亮显示的音符
   onNoteOn?: (note: number) => void; // 音符按下回调
-  onNoteOff?: (note: number) => void; // 音符释放回调
+  onNoteOff?: (note: number) => void; // 音符释放回调，暂未使用
 }
 
 // 音符名称映射
@@ -35,8 +35,7 @@ export default function PianoKeyboard({
   endNote = 72, // C5
   showNoteNames = true,
   highlightedNotes = [],
-  onNoteOn,
-  onNoteOff
+  onNoteOn
 }: PianoKeyboardProps) {
   // 活跃的音符状态
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
