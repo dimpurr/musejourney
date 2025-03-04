@@ -71,21 +71,21 @@ const toolCategories = [
         id: 'interval-trainer', 
         title: '音程听辨训练', 
         description: '练习识别不同的音程。',
-        status: 'coming-soon',
+        status: 'available',
         icon: '👂'
       },
       { 
-        id: 'chord-ear-training', 
+        id: 'chord-identifier', 
         title: '和弦听辨训练', 
         description: '练习识别不同类型的和弦。',
-        status: 'coming-soon',
+        status: 'available',
         icon: '🎧'
       },
       { 
         id: 'progression-ear-training', 
         title: '和声进行听辨训练', 
         description: '练习识别常见的和声进行。',
-        status: 'coming-soon',
+        status: 'available',
         icon: '🔊'
       }
     ]
