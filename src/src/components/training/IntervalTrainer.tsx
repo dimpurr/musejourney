@@ -11,11 +11,14 @@ import {
   getTypeSettings, 
   updateTypeSettings, 
   addTrainingSession, 
+  addTrainingQuestion,
+  getRecentQuestions,
   generateId,
   type TrainingType,
   type IntervalTrainingSettings,
   type GeneralSettings,
-  type TrainingSettings as TrainingSettingsType
+  type TrainingSettings as TrainingSettingsType,
+  type IntervalQuestionDetails
 } from '@/lib/training/trainingStorage';
 
 // 定义音程类型
@@ -83,6 +86,10 @@ export default function IntervalTrainer({
   
   // UI 状态
   const [activeTab, setActiveTab] = useState<'train' | 'progress' | 'settings' | 'history'>('train');
+  
+  // 问题历史
+  const [questionHistory, setQuestionHistory] = useState<IntervalQuestionDetails[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
   
   // 初始化设置
   useEffect(() => {
@@ -214,6 +221,81 @@ export default function IntervalTrainer({
     }
   };
   
+  // 获取音程解释
+  const getIntervalExplanation = (shortName: string) => {
+    const explanations: Record<string, string> = {
+      'P1': '纯一度是相同的音高，频率比为1:1。',
+      'm2': '小二度是半音关系，在钢琴上是相邻的键。频率比约为16:15。',
+      'M2': '大二度是全音关系，在钢琴上相隔一个键。频率比约为9:8。',
+      'm3': '小三度由一个全音和一个半音组成。频率比约为6:5。小三度是小和弦的特征音程。',
+      'M3': '大三度由两个全音组成。频率比约为5:4。大三度是大和弦的特征音程。',
+      'P4': '纯四度由两个全音和一个半音组成。频率比为4:3。',
+      'A4': '增四度由三个全音组成，也称为三全音。频率比约为45:32。',
+      'd5': '减五度与增四度是同音异名，在十二平均律中是相同的音高。',
+      'P5': '纯五度由三个全音和一个半音组成。频率比为3:2。是最协和的音程之一。',
+      'm6': '小六度由三个全音和两个半音组成。频率比约为8:5。',
+      'M6': '大六度由四个全音和一个半音组成。频率比约为5:3。',
+      'm7': '小七度由四个全音和两个半音组成。频率比约为16:9或9:5。',
+      'M7': '大七度由五个全音和一个半音组成。频率比约为15:8。',
+      'P8': '纯八度，也称为八度音，频率比为2:1。',
+      'A4/d5': '增四度/减五度是三全音，在十二平均律中是相同的音高。这个音程在传统和声中被称为"魔鬼音程"，因为它不稳定且难以演唱。'
+    };
+    
+    return explanations[shortName] || `${shortName}是一个音程，由两个音符组成，具有特定的音高关系。`;
+  };
+  
+  // 加载历史问题
+  useEffect(() => {
+    const recentQuestions = getRecentQuestions('interval', 10);
+    if (recentQuestions.length > 0) {
+      const intervalQuestions = recentQuestions
+        .filter(q => q.details)
+        .map(q => q.details as IntervalQuestionDetails);
+      
+      if (intervalQuestions.length > 0) {
+        setQuestionHistory(intervalQuestions);
+      }
+    }
+  }, []);
+  
+  // 上一个音程
+  const previousInterval = () => {
+    if (currentQuestionIndex < questionHistory.length - 1) {
+      const prevIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(prevIndex);
+      setCurrentInterval(questionHistory[prevIndex]);
+      setUserAnswer(null);
+      setIsCorrect(null);
+      setShowAnswer(false);
+    }
+  };
+  
+  // 生成新的音程
+  const generateNewInterval = useCallback(() => {
+    // ... existing code ...
+    
+    // 创建新的音程
+    const newInterval = {
+      firstNote,
+      secondNote,
+      intervalName: randomInterval.name,
+      intervalShortName: randomInterval.shortName,
+      firstNoteMidi,
+      secondNoteMidi
+    };
+    
+    // 添加到历史记录
+    setQuestionHistory(prev => [newInterval, ...prev.slice(0, 9)]);
+    setCurrentQuestionIndex(0);
+    
+    setCurrentInterval(newInterval);
+    setUserAnswer(null);
+    setIsCorrect(null);
+    setShowAnswer(false);
+    
+    // ... existing code ...
+  }, [/* existing dependencies */]);
+  
   // 检查答案
   const checkAnswer = (answer: string) => {
     if (!currentInterval || userAnswer !== null) return;
@@ -228,6 +310,15 @@ export default function IntervalTrainer({
       correct: prev.correct + (correct ? 1 : 0),
       streak: correct ? prev.streak + 1 : 0
     }));
+    
+    // 添加到训练历史
+    addTrainingQuestion({
+      type: 'interval',
+      question: `${currentInterval.firstNote} to ${currentInterval.secondNote}`,
+      answer: answer,
+      isCorrect: correct,
+      details: currentInterval
+    });
   };
   
   // 下一个音程
@@ -396,12 +487,31 @@ export default function IntervalTrainer({
                 </div>
               )}
               
-              <div className="flex justify-center mt-4">
+              {/* 音程解释 */}
+              {showAnswer && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold mb-2">音程解释:</h4>
+                  <p>{getIntervalExplanation(currentInterval.intervalShortName)}</p>
+                </div>
+              )}
+              
+              <div className="flex justify-center mt-4 space-x-4">
+                <button
+                  onClick={previousInterval}
+                  disabled={currentQuestionIndex >= questionHistory.length - 1}
+                  className={`px-6 py-2 rounded-md transition-colors ${
+                    currentQuestionIndex >= questionHistory.length - 1
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-600 text-white hover:bg-gray-700'
+                  }`}
+                >
+                  上一题
+                </button>
                 <button
                   onClick={nextInterval}
                   className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  下一个音程
+                  下一题
                 </button>
               </div>
             </div>

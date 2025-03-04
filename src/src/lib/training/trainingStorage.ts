@@ -6,6 +6,37 @@ export type TrainingType = 'interval' | 'chord' | 'progression';
 // 训练难度
 export type TrainingDifficulty = 'easy' | 'medium' | 'hard' | 'custom';
 
+// 训练问题详情类型
+export interface IntervalQuestionDetails {
+  firstNote: string;
+  secondNote: string;
+  intervalName: string;
+  intervalShortName: string;
+  firstNoteMidi: number;
+  secondNoteMidi: number;
+}
+
+export interface ChordQuestionDetails {
+  root: string;
+  rootMidi: number;
+  type: string;
+  typeName: string;
+  midiNotes: number[];
+  fullName: string;
+}
+
+export interface ProgressionQuestionDetails {
+  name: string;
+  description: string;
+  chords: string[];
+  romanNumerals: string[];
+}
+
+export type QuestionDetails = 
+  | IntervalQuestionDetails 
+  | ChordQuestionDetails 
+  | ProgressionQuestionDetails;
+
 // 训练记录项
 export interface TrainingHistoryItem {
   id: string;
@@ -14,6 +45,7 @@ export interface TrainingHistoryItem {
   answer: string;
   isCorrect: boolean;
   timestamp: number;
+  details?: QuestionDetails; // 存储问题的详细信息，如音程/和弦/和声进行的具体内容
 }
 
 // 训练会话
@@ -30,6 +62,7 @@ export interface TrainingSession {
 // 训练历史
 export interface TrainingHistory {
   sessions: TrainingSession[];
+  questions: TrainingHistoryItem[]; // 添加问题历史记录
 }
 
 // 音程训练设置
@@ -106,6 +139,12 @@ const DEFAULT_SETTINGS: TrainingSettings = {
   general: DEFAULT_GENERAL_SETTINGS
 };
 
+// 默认训练历史
+const DEFAULT_TRAINING_HISTORY: TrainingHistory = {
+  sessions: [],
+  questions: []
+};
+
 // 存储键
 const HISTORY_STORAGE_KEY = 'musejourney_training_history';
 const SETTINGS_STORAGE_KEY = 'musejourney_training_settings';
@@ -113,19 +152,27 @@ const SETTINGS_STORAGE_KEY = 'musejourney_training_settings';
 // 获取训练历史
 export function getTrainingHistory(): TrainingHistory {
   if (typeof window === 'undefined') {
-    return { sessions: [] };
+    return DEFAULT_TRAINING_HISTORY;
   }
   
   try {
-    const storedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
-    if (storedHistory) {
-      return JSON.parse(storedHistory);
+    const historyJson = localStorage.getItem('trainingHistory');
+    if (!historyJson) {
+      return DEFAULT_TRAINING_HISTORY;
     }
+    
+    const history = JSON.parse(historyJson) as TrainingHistory;
+    
+    // 兼容旧版本数据
+    if (!history.questions) {
+      history.questions = [];
+    }
+    
+    return history;
   } catch (error) {
     console.error('Failed to load training history:', error);
+    return DEFAULT_TRAINING_HISTORY;
   }
-  
-  return { sessions: [] };
 }
 
 // 保存训练历史
@@ -148,7 +195,7 @@ export function addTrainingSession(session: TrainingSession): void {
 
 // 清除训练历史
 export function clearTrainingHistory(): void {
-  saveTrainingHistory({ sessions: [] });
+  saveTrainingHistory({ sessions: [], questions: [] });
 }
 
 // 获取训练设置
@@ -258,4 +305,34 @@ export function getWeekStats(type?: TrainingType) {
 // 生成唯一ID
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
+}
+
+// 添加训练问题记录
+export function addTrainingQuestion(question: Omit<TrainingHistoryItem, 'id' | 'timestamp'>): string {
+  const history = getTrainingHistory();
+  const id = generateId();
+  
+  const newQuestion: TrainingHistoryItem = {
+    ...question,
+    id,
+    timestamp: Date.now()
+  };
+  
+  history.questions.unshift(newQuestion); // 添加到开头，最新的问题在前面
+  
+  // 限制保存的问题数量，最多保存100个
+  if (history.questions.length > 100) {
+    history.questions = history.questions.slice(0, 100);
+  }
+  
+  saveTrainingHistory(history);
+  return id;
+}
+
+// 获取最近的训练问题
+export function getRecentQuestions(type: TrainingType, limit: number = 10): TrainingHistoryItem[] {
+  const history = getTrainingHistory();
+  return history.questions
+    .filter(q => q.type === type)
+    .slice(0, limit);
 } 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { playChordProgression } from '@/lib/audio/audioEngine';
+import { playChordProgression, playChord } from '@/lib/audio/audioEngine';
 import { getChordInfo } from '@/lib/theory/musicTheory';
 import PianoKeyboard from '../music/PianoKeyboard';
 import TrainingHistory from './TrainingHistory';
@@ -11,11 +11,13 @@ import {
   getTypeSettings, 
   updateTypeSettings, 
   addTrainingSession, 
+  addTrainingQuestion,
+  getRecentQuestions,
   generateId,
-  type TrainingType,
   type ProgressionTrainingSettings,
   type GeneralSettings,
-  type TrainingSettings as TrainingSettingsType
+  type TrainingSettings as TrainingSettingsType,
+  type ProgressionQuestionDetails
 } from '@/lib/training/trainingStorage';
 
 // 常见和声进行
@@ -95,6 +97,13 @@ export default function ProgressionTrainer({
   // UI 状态
   const [activeTab, setActiveTab] = useState<'train' | 'progress' | 'settings' | 'history'>('train');
   
+  // 问题历史
+  const [questionHistory, setQuestionHistory] = useState<ProgressionQuestionDetails[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
+  
+  // 当前播放的和弦索引
+  const [currentChordIndex, setCurrentChordIndex] = useState<number | null>(null);
+  
   // 初始化设置
   useEffect(() => {
     if (selectedProgressions) {
@@ -150,16 +159,39 @@ export default function ProgressionTrainer({
     };
   }, [sessionActive, endSession]);
   
+  // 加载历史问题
+  useEffect(() => {
+    const recentQuestions = getRecentQuestions('progression', 10);
+    if (recentQuestions.length > 0) {
+      const progressionQuestions = recentQuestions
+        .filter(q => q.details)
+        .map(q => q.details as ProgressionQuestionDetails);
+      
+      if (progressionQuestions.length > 0) {
+        setQuestionHistory(progressionQuestions);
+      }
+    }
+  }, []);
+  
   // 生成新的和声进行
   const generateNewProgression = useCallback(() => {
     if (availableProgressions.length === 0) return;
     
     const randomIndex = Math.floor(Math.random() * availableProgressions.length);
-    setCurrentProgression(availableProgressions[randomIndex]);
+    const randomProgression = availableProgressions[randomIndex];
+    
+    // 添加到历史记录
+    if (randomProgression) {
+      setQuestionHistory(prev => [randomProgression, ...prev.slice(0, 9)]);
+      setCurrentQuestionIndex(0);
+    }
+    
+    setCurrentProgression(randomProgression);
     setUserAnswer(null);
     setIsCorrect(null);
     setShowAnswer(false);
     setActiveNotes([]);
+    setCurrentChordIndex(null);
     
     // 如果设置了自动播放，则自动播放和声进行
     if (settings.general?.autoPlayEnabled) {
@@ -239,7 +271,86 @@ export default function ProgressionTrainer({
       correct: prev.correct + (isAnswerCorrect ? 1 : 0),
       streak: isAnswerCorrect ? prev.streak + 1 : 0
     }));
+    
+    // 添加到训练历史
+    addTrainingQuestion({
+      type: 'progression',
+      question: currentProgression.chords.join(' → '),
+      answer: answer,
+      isCorrect: isAnswerCorrect,
+      details: currentProgression
+    });
   }, [currentProgression, userAnswer]);
+  
+  // 上一个和声进行
+  const previousProgression = () => {
+    if (currentQuestionIndex < questionHistory.length - 1) {
+      const prevIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(prevIndex);
+      setCurrentProgression(questionHistory[prevIndex]);
+      setUserAnswer(null);
+      setIsCorrect(null);
+      setShowAnswer(false);
+      setActiveNotes([]);
+      setCurrentChordIndex(null);
+    }
+  };
+  
+  // 播放单个和弦
+  const playChordAtIndex = (index: number) => {
+    if (!currentProgression) return;
+    
+    const chord = currentProgression.chords[index];
+    const chordInfo = getChordInfo(chord);
+    if (!chordInfo || !chordInfo.notes) return;
+    
+    // 添加八度信息
+    const notesWithOctave = chordInfo.notes.map(note => {
+      if (note.match(/\d$/)) return note; // 已经有八度信息
+      return `${note}4`; // 添加默认八度
+    });
+    
+    // 播放和弦
+    playChord(notesWithOctave, 0.5);
+    
+    // 更新活跃音符（仅用于视觉反馈）
+    const midiNotes: number[] = [];
+    notesWithOctave.forEach(note => {
+      const match = note.match(/([A-G][#b]?)(\d+)/);
+      if (match) {
+        const noteName = match[1];
+        const octave = parseInt(match[2]);
+        
+        // 简单的MIDI音符计算
+        const noteMap: Record<string, number> = { 'C': 0, 'C#': 1, 'Db': 1, 'D': 2, 'D#': 3, 'Eb': 3, 
+                                                'E': 4, 'F': 5, 'F#': 6, 'Gb': 6, 'G': 7, 'G#': 8, 
+                                                'Ab': 8, 'A': 9, 'A#': 10, 'Bb': 10, 'B': 11 };
+        
+        if (noteName in noteMap) {
+          const midiNote = 12 * (octave + 1) + noteMap[noteName];
+          if (!midiNotes.includes(midiNote)) {
+            midiNotes.push(midiNote);
+          }
+        }
+      }
+    });
+    
+    setActiveNotes(midiNotes);
+    setCurrentChordIndex(index);
+  };
+  
+  // 获取和声进行解释
+  const getProgressionExplanation = (name: string) => {
+    const explanations: Record<string, string> = {
+      'I-IV-V-I': '基础和声进行是西方音乐中最常见的和声进行之一。它由主和弦(I)、下属和弦(IV)、属和弦(V)和主和弦(I)组成，形成了一个完整的和声循环。这个进行在流行音乐、民谣和古典音乐中都非常常见。',
+      'I-V-vi-IV': '流行音乐进行是现代流行音乐中最常用的和声进行之一。它由主和弦(I)、属和弦(V)、副属和弦(vi)和下属和弦(IV)组成。这个进行因其情感丰富且易于歌唱而广受欢迎。',
+      'ii-V-I': '爵士和声进行是爵士乐中的基本和声公式。它由二级和弦(ii)、属和弦(V)和主和弦(I)组成。这个进行创造了一种强烈的和声张力和解决感，是爵士即兴演奏的基础。',
+      'I-vi-IV-V': '50年代进行因在20世纪50年代的流行音乐中广泛使用而得名。它由主和弦(I)、副属和弦(vi)、下属和弦(IV)和属和弦(V)组成，创造了一种怀旧、温暖的音乐感觉。',
+      'vi-IV-I-V': '悲伤进行因其忧郁的情感色彩而得名。它由副属和弦(vi)、下属和弦(IV)、主和弦(I)和属和弦(V)组成。这个进行常用于表达悲伤、怀念或内省的情感。'
+    };
+    
+    return explanations[name] || `${name}是一个和声进行，由一系列和弦按特定顺序排列组成，创造出特定的和声效果和情感色彩。`;
+  };
   
   // 下一个和声进行
   const nextProgression = useCallback(() => {
@@ -256,10 +367,10 @@ export default function ProgressionTrainer({
         const updatedSettings: ExtendedProgressionSettings = {
           ...prev,
           general: {
-            ...prev.general,
-            autoPlayEnabled: newSettings.general.autoPlayEnabled ?? prev.general.autoPlayEnabled,
-            showKeyboard: newSettings.general.showKeyboard ?? prev.general.showKeyboard,
-            keyboardSize: newSettings.general.keyboardSize ?? prev.general.keyboardSize
+            ...prev.general!,
+            autoPlayEnabled: newSettings.general?.autoPlayEnabled ?? prev.general?.autoPlayEnabled ?? false,
+            showKeyboard: newSettings.general?.showKeyboard ?? prev.general?.showKeyboard ?? true,
+            keyboardSize: newSettings.general?.keyboardSize ?? prev.general?.keyboardSize ?? 'medium'
           }
         };
         return updatedSettings;
@@ -406,14 +517,54 @@ export default function ProgressionTrainer({
                       <p className="mb-4">
                         和弦功能: {currentProgression.romanNumerals.join(' → ')}
                       </p>
+                      
+                      {/* 和声进行解释 */}
+                      <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                        <h4 className="font-semibold mb-2">和声进行解释:</h4>
+                        <p>{getProgressionExplanation(currentProgression.name)}</p>
+                      </div>
+                      
+                      {/* 逐个和弦播放 */}
+                      <div className="mb-4">
+                        <h4 className="font-semibold mb-2">逐个和弦播放:</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {currentProgression.chords.map((chord, index) => (
+                            <button
+                              key={index}
+                              onClick={() => playChordAtIndex(index)}
+                              className={`px-3 py-1 border rounded-md ${
+                                currentChordIndex !== null && currentChordIndex === index
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-white hover:bg-gray-100'
+                              }`}
+                            >
+                              {chord} ({currentProgression.romanNumerals[index]})
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </>
                   )}
-                  <button
-                    onClick={nextProgression}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    下一个
-                  </button>
+                  
+                  <div className="flex justify-center mt-4 space-x-4">
+                    <button
+                      onClick={previousProgression}
+                      disabled={currentQuestionIndex >= questionHistory.length - 1}
+                      className={`px-4 py-2 rounded-md transition-colors ${
+                        currentQuestionIndex >= questionHistory.length - 1
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-gray-600 text-white hover:bg-gray-700'
+                      }`}
+                    >
+                      上一题
+                    </button>
+                    <button
+                      onClick={nextProgression}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      下一题
+                    </button>
+                  </div>
                 </div>
               )}
             </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { playChord } from '@/lib/audio/audioEngine';
+import { getChordInfo } from '@/lib/theory/musicTheory';
 import PianoKeyboard from '../music/PianoKeyboard';
 import TrainingHistory from './TrainingHistory';
 import TrainingSettingsComponent from './TrainingSettings';
@@ -10,11 +11,14 @@ import {
   getTypeSettings, 
   updateTypeSettings, 
   addTrainingSession, 
+  addTrainingQuestion,
+  getRecentQuestions,
   generateId,
   type TrainingType,
   type ChordTrainingSettings,
   type GeneralSettings,
-  type TrainingSettings as TrainingSettingsType
+  type TrainingSettings as TrainingSettingsType,
+  type ChordQuestionDetails
 } from '@/lib/training/trainingStorage';
 
 // 定义和弦类型
@@ -105,6 +109,10 @@ export default function ChordIdentifier({
   // UI 状态
   const [activeTab, setActiveTab] = useState<'train' | 'progress' | 'settings' | 'history'>('train');
   
+  // 问题历史
+  const [questionHistory, setQuestionHistory] = useState<ChordQuestionDetails[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1);
+  
   // 初始化设置
   useEffect(() => {
     if (selectedChordTypes) {
@@ -161,6 +169,20 @@ export default function ChordIdentifier({
       }
     };
   }, [sessionActive, endSession]);
+  
+  // 加载历史问题
+  useEffect(() => {
+    const recentQuestions = getRecentQuestions('chord', 10);
+    if (recentQuestions.length > 0) {
+      const chordQuestions = recentQuestions
+        .filter(q => q.details)
+        .map(q => q.details as ChordQuestionDetails);
+      
+      if (chordQuestions.length > 0) {
+        setQuestionHistory(chordQuestions);
+      }
+    }
+  }, []);
   
   // 生成随机和弦
   const generateChord = useCallback(() => {
@@ -275,11 +297,36 @@ export default function ChordIdentifier({
       correct: prev.correct + (correct ? 1 : 0),
       streak: correct ? prev.streak + 1 : 0
     }));
+    
+    // 添加到训练历史
+    if (currentChord) {
+      addTrainingQuestion({
+        type: 'chord',
+        question: currentChord.fullName,
+        answer: `${userRootAnswer || ''}${userTypeAnswer || ''}`,
+        isCorrect: correct,
+        details: currentChord
+      });
+    }
   };
   
   // 下一个和弦
   const nextChord = () => {
     generateChord();
+  };
+  
+  // 上一个和弦
+  const previousChord = () => {
+    if (currentQuestionIndex < questionHistory.length - 1) {
+      const prevIndex = currentQuestionIndex + 1;
+      setCurrentQuestionIndex(prevIndex);
+      setCurrentChord(questionHistory[prevIndex]);
+      setUserRootAnswer(null);
+      setUserTypeAnswer(null);
+      setIsRootCorrect(null);
+      setIsTypeCorrect(null);
+      setShowAnswer(false);
+    }
   };
   
   // 处理设置变更
@@ -290,6 +337,25 @@ export default function ChordIdentifier({
     if (newSettings.general) {
       setSettings(prev => ({ ...prev, general: { ...prev.general, ...newSettings.general } }));
     }
+  };
+  
+  // 获取和弦解释
+  const getChordExplanation = (root: string, type: string) => {
+    const typeExplanations: Record<string, string> = {
+      'maj': '大三和弦是最基本的和弦类型，由根音、大三度和纯五度组成。它具有明亮、稳定的音色，常用于表达欢快、明朗的情绪。',
+      'min': '小三和弦由根音、小三度和纯五度组成。它的音色相对暗淡、柔和，常用于表达忧伤、温柔的情绪。',
+      'dim': '减三和弦由根音、小三度和减五度组成。它具有紧张、不稳定的音色，常用于表达神秘、恐惧的情绪。',
+      'aug': '增三和弦由根音、大三度和增五度组成。它的音色明亮但不稳定，常用于表达紧张、不安或神秘的情绪。',
+      'sus4': '挂四和弦用纯四度代替三度，由根音、纯四度和纯五度组成。它具有开放、悬而未决的音色。',
+      'sus2': '挂二和弦用大二度代替三度，由根音、大二度和纯五度组成。它具有开放、明亮的音色。',
+      '7': '属七和弦由大三和弦加小七度组成。它是最常见的七和弦，具有强烈的解决倾向，常用于V级和弦。',
+      'maj7': '大七和弦由大三和弦加大七度组成。它具有明亮、温暖的音色，常用于表达浪漫、梦幻的情绪。',
+      'min7': '小七和弦由小三和弦加小七度组成。它具有柔和、忧郁的音色，常用于ii级和弦或爵士乐中。',
+      'dim7': '减七和弦由减三和弦加减七度组成。它具有强烈的不稳定性，常用于过渡和声或调性转换。',
+      'm7b5': '半减七和弦由减三和弦加小七度组成。它常用于ii级和弦的变化形式，特别是在小调中。'
+    };
+    
+    return typeExplanations[type] || `${root}${type}是一个和弦，由多个音符按特定音程关系组成。`;
   };
   
   // 如果没有当前和弦，显示加载状态
@@ -477,12 +543,31 @@ export default function ChordIdentifier({
                 </div>
               )}
               
-              <div className="flex justify-center mt-4">
+              {/* 和弦解释 */}
+              {showAnswer && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <h4 className="font-semibold mb-2">和弦解释:</h4>
+                  <p>{getChordExplanation(currentChord.root, currentChord.type)}</p>
+                </div>
+              )}
+              
+              <div className="flex justify-center mt-4 space-x-4">
+                <button
+                  onClick={previousChord}
+                  disabled={currentQuestionIndex >= questionHistory.length - 1}
+                  className={`px-6 py-2 rounded-md transition-colors ${
+                    currentQuestionIndex >= questionHistory.length - 1
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gray-600 text-white hover:bg-gray-700'
+                  }`}
+                >
+                  上一题
+                </button>
                 <button
                   onClick={nextChord}
                   className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
-                  下一个和弦
+                  下一题
                 </button>
               </div>
             </div>
