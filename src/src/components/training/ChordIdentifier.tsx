@@ -274,6 +274,44 @@ export default function ChordIdentifier({
     if (!settings.identifyType || userTypeAnswer !== null) {
       updateStats(correct && (settings.identifyType ? isTypeCorrect === true : true));
     }
+
+    // 如果答案不正确，播放用户选择的根音和弦
+    if (!correct) {
+      // 查找用户选择的根音
+      const selectedRoot = ROOT_NOTES.find(r => r.name === answer);
+      if (selectedRoot && currentChord) {
+        // 使用用户选择的根音和当前和弦的类型创建新的和弦
+        const rootMidi = selectedRoot.midi;
+        const chordType = CHORD_TYPES.find(c => c.shortName === currentChord.type);
+        
+        if (chordType) {
+          const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+          
+          // 计算新的和弦音符
+          const midiNotes = chordType.notes.map(interval => rootMidi + interval);
+          
+          // 将 MIDI 音符转换为音符名称
+          const notes = midiNotes.map(midi => {
+            const octave = Math.floor(midi / 12) - 1;
+            const noteName = noteNames[midi % 12];
+            return `${noteName}${octave}`;
+          });
+          
+          // 延迟播放用户选择的和弦
+          setTimeout(() => {
+            if (settings.playbackMode === 'arpeggio') {
+              // 琶音播放
+              notes.forEach((note, index) => {
+                setTimeout(() => playChord([note], 0.5), index * 500);
+              });
+            } else {
+              // 和弦播放
+              playChord(notes, 1);
+            }
+          }, 1000); // 延迟1秒后播放，以便用户能够区分
+        }
+      }
+    }
   };
   
   // 检查和弦类型答案
@@ -287,6 +325,40 @@ export default function ChordIdentifier({
     // 如果不需要识别根音，或者已经回答了根音，则更新统计信息
     if (!settings.identifyRoot || userRootAnswer !== null) {
       updateStats((settings.identifyRoot ? isRootCorrect === true : true) && correct);
+    }
+
+    // 如果答案不正确，播放用户选择的和弦类型
+    if (!correct) {
+      // 查找用户选择的和弦类型
+      const selectedChordType = CHORD_TYPES.find(c => c.shortName === answer);
+      if (selectedChordType && currentChord) {
+        // 使用当前和弦的根音和用户选择的和弦类型创建新的和弦
+        const rootMidi = currentChord.rootMidi;
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        
+        // 计算新的和弦音符
+        const midiNotes = selectedChordType.notes.map(interval => rootMidi + interval);
+        
+        // 将 MIDI 音符转换为音符名称
+        const notes = midiNotes.map(midi => {
+          const octave = Math.floor(midi / 12) - 1;
+          const noteName = noteNames[midi % 12];
+          return `${noteName}${octave}`;
+        });
+        
+        // 延迟播放用户选择的和弦
+        setTimeout(() => {
+          if (settings.playbackMode === 'arpeggio') {
+            // 琶音播放
+            notes.forEach((note, index) => {
+              setTimeout(() => playChord([note], 0.5), index * 500);
+            });
+          } else {
+            // 和弦播放
+            playChord(notes, 1);
+          }
+        }, 1000); // 延迟1秒后播放，以便用户能够区分
+      }
     }
   };
   

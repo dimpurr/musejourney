@@ -280,6 +280,30 @@ export default function ProgressionTrainer({
       isCorrect: isAnswerCorrect,
       details: currentProgression
     });
+
+    // 如果答案不正确，播放用户选择的和声进行
+    if (!isAnswerCorrect) {
+      // 查找用户选择的和声进行
+      const selectedProgression = PROGRESSIONS.find(p => p.name === answer);
+      if (selectedProgression) {
+        // 准备和弦数据
+        const chordsWithNotes = selectedProgression.chords.map(chord => {
+          const chordInfo = getChordInfo(chord);
+          if (!chordInfo || !chordInfo.notes) return ['C4', 'E4', 'G4']; // 默认C和弦
+          
+          // 添加八度信息
+          return chordInfo.notes.map(note => {
+            if (note.match(/\d$/)) return note; // 已经有八度信息
+            return `${note}4`; // 添加默认八度
+          });
+        });
+        
+        // 播放用户选择的和声进行
+        setTimeout(() => {
+          playChordProgression(chordsWithNotes, chordsWithNotes.map(() => 1)); // 每个和弦持续1秒
+        }, 1000); // 延迟1秒后播放，以便用户能够区分
+      }
+    }
   }, [currentProgression, userAnswer]);
   
   // 上一个和声进行

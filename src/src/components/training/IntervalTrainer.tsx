@@ -319,6 +319,31 @@ export default function IntervalTrainer({
       isCorrect: correct,
       details: currentInterval
     });
+
+    // 如果答案不正确，播放用户选择的音程
+    if (!correct) {
+      // 查找用户选择的音程
+      const selectedInterval = INTERVALS.find(i => i.shortName === answer);
+      if (selectedInterval && currentInterval) {
+        // 计算新的第二个音符
+        const firstNoteMidi = currentInterval.firstNoteMidi;
+        const secondNoteMidi = firstNoteMidi + selectedInterval.semitones;
+        
+        // 将MIDI音符转换为音符名称
+        const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+        const octave = Math.floor(secondNoteMidi / 12) - 1;
+        const noteName = noteNames[secondNoteMidi % 12];
+        const secondNote = `${noteName}${octave}`;
+        
+        // 延迟播放用户选择的音程
+        setTimeout(() => {
+          // 播放第一个音符
+          playNote(currentInterval.firstNote, 0.5);
+          // 然后播放计算出的第二个音符
+          setTimeout(() => playNote(secondNote, 0.5), 1000);
+        }, 1000); // 延迟1秒后播放，以便用户能够区分
+      }
+    }
   };
   
   // 下一个音程
